@@ -1,44 +1,36 @@
 import streamlit as st
-import numpy as np
+import torch
+from torchvision import transforms
 from PIL import Image
-import cv2
+import numpy as np
 
-st.set_page_config(
-    page_title="Crack Detection Demo",
-    layout="centered"
+st.set_page_config(page_title="AI Image Demo", layout="centered")
+
+st.title("🧠 AI Image Analyzer (PyTorch)")
+st.write("อัปโหลดรูป แล้วให้ AI วิเคราะห์")
+
+# โหลดโมเดลตัวอย่าง (ยังไม่ train จริง)
+model = torch.nn.Sequential(
+    torch.nn.Flatten(),
+    torch.nn.Linear(224 * 224 * 3, 2),
+    torch.nn.Softmax(dim=1)
 )
 
-st.title("🧱 Crack Detection Demo")
-st.write("อัปโหลดภาพเพื่อทดสอบการตรวจจับรอยร้าว")
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor()
+])
 
-@st.cache_resource
-def load_model():
-    import tensorflow as tf
-    return tf.keras.models.load_model("model.h5")
-
-uploaded_file = st.file_uploader(
-    "อัปโหลดภาพ",
-    type=["jpg", "jpeg", "png"]
-)
+uploaded_file = st.file_uploader("📤 อัปโหลดรูป", type=["jpg", "png"])
 
 if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="ภาพต้นฉบับ", use_container_width=True)
+    st.image(image, caption="รูปที่อัปโหลด", use_column_width=True)
 
-    img = np.array(image)
-    img = cv2.resize(img, (224, 224))
-    img = img / 255.0
-    img = np.expand_dims(img, axis=0)
+    img_tensor = transform(image).unsqueeze(0)
 
-    with st.spinner("กำลังโหลดโมเดล..."):
-        model = load_model()
+    with torch.no_grad():
+        output = model(img_tensor)
+        confidence = torch.max(output).item()
 
-    with st.spinner("กำลังวิเคราะห์..."):
-        pred = model.predict(img)
-
-    score = float(pred[0][0])
-
-    if score > 0.5:
-        st.error(f"⚠️ พบรอยร้าว (confidence {score:.2f})")
-    else:
-        st.success(f"✅ ไม่พบรอยร้าว (confidence {1-score:.2f})")
+    st.success(f"✅ วิเคราะห์เสร็จ (ความมั่นใจ: {confidence:.2f})")
